@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plain Text → PDF · autocorrect + organize</title>
+  <!-- html2pdf library (bundled) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #f5f7fb;
+      font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .card {
+      max-width: 1100px;
+      width: 100%;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.2);
+      padding: 2rem 2rem 2.5rem;
+      transition: 0.2s;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #0b1e33;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .sub {
+      color: #4a5b6e;
+      font-weight: 400;
+      font-size: 0.95rem;
+      margin-bottom: 1.8rem;
+      border-left: 4px solid #7b8cff;
+      padding-left: 1rem;
+      background: #f0f3fe;
+      border-radius: 0 12px 12px 0;
+      line-height: 1.4;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.8rem;
+      margin-top: 0.4rem;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+      body { padding: 1rem; }
+      .card { padding: 1.5rem; }
+    }
+
+    .panel {
+      background: #fafcff;
+      border-radius: 20px;
+      padding: 1.2rem 1.2rem 1.5rem;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0, 20, 40, 0.04);
+      border: 1px solid #eef2f8;
+    }
+
+    .panel h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1a2b3c;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel h2 i {
+      font-style: normal;
+      background: #dce3ef;
+      border-radius: 30px;
+      padding: 0 10px;
+      font-size: 0.7rem;
+      color: #1f3348;
+    }
+
+    textarea {
+      width: 100%;
+      height: 340px;
+      padding: 1rem 1.1rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #1a2632;
+      background: white;
+      border: 1px solid #d8e0ea;
+      border-radius: 18px;
+      resize: vertical;
+      transition: 0.15s;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.02);
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #7b8cff;
+      box-shadow: 0 0 0 4px rgba(123, 140, 255, 0.15);
+    }
+
+    .preview-box {
+      background: white;
+      border: 1px solid #d8e0ea;
+      border-radius: 18px;
+      padding: 1rem 1.2rem;
+      min-height: 340px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #1a2632;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.02);
+    }
+
+    .preview-box p {
+      margin: 0 0 0.5rem 0;
+    }
+
+    .preview-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .preview-box .meta-line {
+      color: #4a6a8b;
+      font-size: 0.8rem;
+      border-bottom: 1px dashed #d0dbe9;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin: 1.6rem 0 0.6rem;
+      gap: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      background: white;
+      border: 1px solid #ced6e3;
+      padding: 0.6rem 1.3rem;
+      border-radius: 60px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #1b2c3f;
+      cursor: pointer;
+      transition: 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .btn-primary {
+      background: #1f2e47;
+      border: 1px solid #1f2e47;
+      color: white;
+      box-shadow: 0 4px 10px rgba(26, 45, 75, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: #142133;
+      border-color: #142133;
+      transform: scale(0.97);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #cbd5e3;
+    }
+
+    .btn-outline:hover {
+      background: #eef3fc;
+      border-color: #9aabbf;
+    }
+
+    .btn-success {
+      background: #1f7b4d;
+      border: 1px solid #1f7b4d;
+      color: white;
+      box-shadow: 0 4px 10px rgba(28, 110, 64, 0.25);
+    }
+
+    .btn-success:hover {
+      background: #14633d;
+      border-color: #14633d;
+      transform: scale(0.97);
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      background: #e7ecf5;
+      border-radius: 40px;
+      padding: 0.1rem 0.8rem;
+      color: #1f3853;
+    }
+
+    .footer-hint {
+      font-size: 0.8rem;
+      color: #5b6f86;
+      margin-top: 1rem;
+      border-top: 1px solid #e3eaf2;
+      padding-top: 1rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .footer-hint span {
+      background: #eff3f9;
+      padding: 0.1rem 0.9rem;
+      border-radius: 50px;
+    }
+
+    /* PDF specific styling (will be applied to preview) */
+    .pdf-ready {
+      font-family: 'Segoe UI', 'Roboto', sans-serif;
+    }
+
+    .pdf-ready .meta-line {
+      color: #2a4c6e;
+      font-weight: 500;
+    }
+
+    /* scroll */
+    .preview-box::-webkit-scrollbar {
+      width: 6px;
+    }
+    .preview-box::-webkit-scrollbar-track {
+      background: #eef3f9;
+      border-radius: 8px;
+    }
+    .preview-box::-webkit-scrollbar-thumb {
+      background: #bcc9db;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>📄 Text → PDF</h1>
+  <div class="sub">
+    ⚡ Paste plain text · auto-format &amp; corrections · download as PDF
+  </div>
+
+  <div class="grid-2">
+    <!-- left: input -->
+    <div class="panel">
+      <h2>📝 Input <i>plain text</i></h2>
+      <textarea id="inputText" placeholder="Paste your plain text here...&#10;Lines will be preserved, double line breaks = new paragraphs.&#10;Basic autocorrection: fixes common punctuation, capitalization, spacing.">Hello there! this is a sample text..   It has some extra spaces and missing capitalization. 
+We'll fix that automatically. 
+Also:   multiple spaces,  weird punctuation like ' quotation marks , and run-on sentences? 
+
+This is a new paragraph (two line breaks above). 
+Let's add some structure: 
+- item one 
+- item two 
+- item three with  extra   spaces 
+
+Email: test@example.com,  and a date: 2026-06-25. 
+We'll keep your formatting clean.</textarea>
+      <div style="margin-top: 0.7rem; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-outline" id="clearBtn" style="padding: 0.3rem 1rem;">🗑️ Clear</button>
+        <button class="btn btn-outline" id="sampleBtn" style="padding: 0.3rem 1rem;">📋 Load sample</button>
+      </div>
+    </div>
+
+    <!-- right: preview + pdf -->
+    <div class="panel">
+      <h2>👁️ Preview <i>formatted + corrected</i></h2>
+      <div id="previewContainer" class="preview-box">
+        <span style="color: #7a8b9f;">Your formatted text will appear here …</span>
+      </div>
+      <div class="toolbar">
+        <div class="btn-group">
+          <button class="btn btn-outline" id="formatBtn">✨ Autocorrect &amp; organize</button>
+        </div>
+        <button class="btn btn-success" id="pdfBtn">⬇️ Download PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-hint">
+    <span>📌 autocorrect: caps, spacing, quotes, punctuation</span>
+    <span>🧩 double line break → new paragraph</span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // DOM refs
+    const inputText = document.getElementById('inputText');
+    const previewContainer = document.getElementById('previewContainer');
+    const formatBtn = document.getElementById('formatBtn');
+    const pdfBtn = document.getElementById('pdfBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const sampleBtn = document.getElementById('sampleBtn');
+
+    // ---------- core autocorrection / formatting ----------
+    function autocorrectAndOrganize(text) {
+      if (!text) return '';
+
+      // 1. normalize line endings (CRLF -> LF)
+      let t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      // 2. remove excessive spaces (more than 2 spaces) but keep intentional indentation?
+      //    we collapse multiple spaces (except newline)
+      t = t.replace(/[ ]{2,}/g, (match) => ' '); // max one space
+
+      // 3. fix common punctuation: quotes, spacing around punctuation
+      //    replace curly quotes with straight (basic)
+      t = t.replace(/['']/g, "'").replace(/[""]/g, '"');
+      //    fix spacing before punctuation: remove space before . , ? ! ; :
+      t = t.replace(/[ ]([.,!?;:])/g, '$1');
+      //    add space after . , ? ! ; : if missing (but not if at end)
+      t = t.replace(/([.,!?;:])([^\s])/g, '$1 $2');
+
+      // 4. capitalize first letter of each sentence (simple heuristic)
+      //    split by sentence-ending punctuation: . ! ? 
+      let sentences = t.match(/[^.!?]+[.!?]+/g);
+      if (sentences) {
+        let rest = t.slice(sentences.join('').length);
+        sentences = sentences.map(s => s.trim());
+        let capitalized = sentences.map(s => {
+          let trimmed = s.trim();
+          if (trimmed.length > 1) {
+            return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+          }
+          return trimmed;
+        });
+        t = capitalized.join(' ') + (rest ? ' ' + rest : '');
+      } else {
+        // fallback: if no punctuation, capitalize first letter of whole text
+        if (t.length > 0) {
+          t = t.charAt(0).toUpperCase() + t.slice(1);
+        }
+      }
+
+      // 5. capitalize "i" when standalone (simple)
+      t = t.replace(/\bi\b/g, 'I');
+
+      // 6. fix double spaces again after punctuation fixes
+      t = t.replace(/[ ]{2,}/g, ' ');
+
+      // 7. ensure double line break -> new paragraph (we keep them)
+      //    but we also want to preserve single line breaks as line breaks in preview
+      //    we'll keep newlines as they are, and in preview we treat \n\n as paragraph.
+
+      // 8. remove trailing spaces
+      t = t.split('\n').map(line => line.trimEnd()).join('\n');
+
+      return t;
+    }
+
+    // ---------- render preview ----------
+    function renderPreview(text) {
+      if (!text || text.trim() === '') {
+        previewContainer.innerHTML = `<span style="color: #7a8b9f;">(empty) paste some text and click "Autocorrect"</span>`;
+        return;
+      }
+
+      // split into paragraphs by double line break
+      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+      let html = '';
+
+      // add each paragraph (preserve single line breaks inside)
+      for (let p of paragraphs) {
+        // replace single newline with <br> inside paragraph (preserve line breaks)
+        let lines = p.split('\n').filter(line => line.trim().length > 0);
+        if (lines.length === 0) continue;
+        // if there is only one line, just put it as paragraph
+        if (lines.length === 1) {
+          html += `<p>${escapeHtml(lines[0])}</p>`;
+        } else {
+          // multiple lines -> join with <br>
+          html += `<p>${lines.map(line => escapeHtml(line)).join('<br>')}</p>`;
+        }
+      }
+
+      if (html === '') {
+        previewContainer.innerHTML = `<span style="color: #7a8b9f;">(formatted preview)</span>`;
+        return;
+      }
+
+      // wrap with a small meta (optional)
+      previewContainer.innerHTML = `<div class="pdf-ready">${html}</div>`;
+    }
+
+    // simple escape
+    function escapeHtml(str) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return str.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // ---------- apply format (autocorrect + render) ----------
+    function applyFormat() {
+      const raw = inputText.value;
+      const corrected = autocorrectAndOrganize(raw);
+      // update textarea with corrected version (optional)
+      inputText.value = corrected;
+      renderPreview(corrected);
+    }
+
+    // ---------- generate PDF (via html2pdf) ----------
+    function generatePDF() {
+      // get current preview content
+      const previewHtml = previewContainer.innerHTML;
+      if (!previewHtml || previewHtml.includes('(empty)') || previewHtml.includes('Your formatted text')) {
+        alert('Please paste some text and click "Autocorrect & organize" first.');
+        return;
+      }
+
+      // build a clean PDF document (styled)
+      const pdfContent = `
+        <!DOCTYPE html>
+        <html>
+          <head><meta charset="UTF-8"><title>Document</title>
+          <style>
+            body { font-family: 'Segoe UI', 'Roboto', sans-serif; padding: 1.8rem; max-width: 100%; background: white; }
+            .pdf-ready { white-space: normal; }
+            .pdf-ready p { margin: 1rem 0 0.5rem 0; line-height: 1.6; }
+            .pdf-ready p:first-of-type { margin-top: 0; }
+            .meta-line { color: #1f4970; font-weight: 500; border-bottom: 1px solid #bcc9db; padding-bottom: 4px; margin-bottom: 12px; }
+          </style>
+          </head>
+          <body>
+            ${previewHtml}
+          </body>
+        </html>
+      `;
+
+      // use html2pdf
+      const element = document.createElement('div');
+      element.innerHTML = pdfContent;
+      // we need to attach to body to render, but hidden
+      element.style.position = 'fixed';
+      element.style.left = '-9999px';
+      element.style.top = '-9999px';
+      element.style.width = '800px';
+      element.style.background = 'white';
+      document.body.appendChild(element);
+
+      const opt = {
+        margin:       0.8,
+        filename:     'formatted-text.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, letterRendering: true, useCORS: true, logging: false },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        document.body.removeChild(element);
+      }).catch(err => {
+        document.body.removeChild(element);
+        alert('PDF generation error: ' + err.message);
+      });
+    }
+
+    // ---------- event binding ----------
+    formatBtn.addEventListener('click', applyFormat);
+
+    pdfBtn.addEventListener('click', generatePDF);
+
+    clearBtn.addEventListener('click', function() {
+      inputText.value = '';
+      previewContainer.innerHTML = `<span style="color: #7a8b9f;">(empty) paste some text and click "Autocorrect"</span>`;
+    });
+
+    sampleBtn.addEventListener('click', function() {
+      const sample = `Hello there! this is a sample text..   It has some extra spaces and missing capitalization. 
+We'll fix that automatically. 
+Also:   multiple spaces,  weird punctuation like ' quotation marks , and run-on sentences? 
+
+This is a new paragraph (two line breaks above). 
+Let's add some structure: 
+- item one 
+- item two 
+- item three with  extra   spaces 
+
+Email: test@example.com,  and a date: 2026-06-25. 
+We'll keep your formatting clean.`;
+      inputText.value = sample;
+      applyFormat();
+    });
+
+    // initial: auto-format on load (with sample)
+    window.addEventListener('DOMContentLoaded', function() {
+      // load the sample by default
+      sampleBtn.click();
+    });
+
+    // also allow Ctrl+Enter to format
+    inputText.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        applyFormat();
+      }
+    });
+
+  })();
+</script>
+</body>
+</html>
