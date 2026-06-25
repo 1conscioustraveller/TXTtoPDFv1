@@ -13,7 +13,7 @@
       min-height: 100vh;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       padding: 2rem 1.5rem;
     }
     .card {
@@ -23,6 +23,7 @@
       border-radius: 32px;
       box-shadow: 0 20px 40px -12px rgba(0,0,0,0.2);
       padding: 2rem 2rem 2.5rem;
+      margin-top: 0;
     }
     h1 {
       font-size: 1.8rem;
@@ -72,7 +73,7 @@
     }
     textarea {
       width: 100%;
-      height: 340px;
+      height: 400px;
       padding: 1rem 1.1rem;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.9rem;
@@ -94,8 +95,8 @@
       border: 1px solid #d8e0ea;
       border-radius: 18px;
       padding: 1rem 1.2rem;
-      min-height: 340px;
-      max-height: 400px;
+      min-height: 400px;
+      max-height: 500px;
       overflow-y: auto;
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 0.95rem;
@@ -128,6 +129,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      user-select: none;
     }
     .btn-primary {
       background: #1f2e47;
@@ -152,6 +154,11 @@
     .btn-success:hover {
       background: #14633d;
       transform: scale(0.97);
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
     }
     .footer-hint {
       font-size: 0.8rem;
@@ -187,7 +194,7 @@
       background: #e8f0fe;
       color: #1f3a6b;
     }
-    /* PDF print styles */
+    /* PDF print styles - FULL PAGE CAPTURE */
     #pdfRenderContainer {
       position: fixed;
       top: -9999px;
@@ -197,6 +204,11 @@
       padding: 2rem;
       z-index: 9999;
       font-family: 'Segoe UI', 'Roboto', sans-serif;
+      display: block;
+    }
+    #pdfRenderContainer .pdf-content {
+      white-space: pre-wrap;
+      word-break: break-word;
     }
     #pdfRenderContainer .pdf-content p {
       margin: 0.8rem 0;
@@ -224,7 +236,12 @@ Let's add some structure:
 - item two 
 - item three with  extra   spaces 
 
-Email: test@example.com,  and a date: 2026-06-25.</textarea>
+Email: test@example.com,  and a date: 2026-06-25.
+
+Here's a longer section to test full PDF capture:
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Another paragraph with more text to ensure the PDF captures everything properly. The content should span multiple pages if needed. This is a test of the PDF generation system.</textarea>
       <div style="margin-top: 0.7rem; display: flex; gap: 8px; flex-wrap: wrap;">
         <button class="btn btn-outline" id="clearBtn" style="padding: 0.3rem 1rem;">🗑️ Clear</button>
         <button class="btn btn-outline" id="sampleBtn" style="padding: 0.3rem 1rem;">📋 Load sample</button>
@@ -272,7 +289,11 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
     if (msg) statusMsg.style.display = 'inline-block';
     else statusMsg.style.display = 'none';
     if (type === 'success') {
-      setTimeout(() => { statusMsg.style.display = 'none'; }, 4000);
+      setTimeout(() => { 
+        if (statusMsg.textContent === msg) {
+          statusMsg.style.display = 'none';
+        }
+      }, 5000);
     }
   }
 
@@ -389,7 +410,7 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
     showStatus(`✅ Autocorrected • ${Math.abs(changes)} character changes`, 'success');
   }
 
-  // ---------- generate PDF (FIXED - using direct html2pdf on visible container) ----------
+  // ---------- generate PDF (FIXED - full content capture) ----------
   function generatePDF() {
     const previewHtml = previewContainer.innerHTML;
     if (!previewHtml || previewHtml.includes('(empty)') || previewHtml.includes('Paste text')) {
@@ -397,35 +418,40 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
       return;
     }
 
+    // Disable button during generation
+    pdfBtn.disabled = true;
+    pdfBtn.textContent = '⏳ Generating...';
     showStatus('⏳ Generating PDF...', 'loading');
 
     // Clear and populate the render container
     pdfRenderContainer.innerHTML = '';
     
-    // Clone the content directly from preview
-    const contentClone = previewContainer.cloneNode(true);
-    contentClone.style.maxHeight = 'none';
-    contentClone.style.overflow = 'visible';
-    contentClone.style.border = 'none';
-    contentClone.style.padding = '0';
-    contentClone.style.background = 'transparent';
-    contentClone.style.minHeight = 'auto';
-    contentClone.classList.add('pdf-content');
+    // Clone the content directly from preview - use innerHTML to preserve all formatting
+    const contentHtml = previewContainer.innerHTML;
     
-    pdfRenderContainer.appendChild(contentClone);
+    // Create wrapper with proper styling
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pdf-content';
+    wrapper.innerHTML = contentHtml;
+    pdfRenderContainer.appendChild(wrapper);
 
-    // Make sure the container is visible for html2canvas
+    // Set container to be visible but off-screen for rendering
     pdfRenderContainer.style.position = 'fixed';
-    pdfRenderContainer.style.top = '0';
-    pdfRenderContainer.style.left = '0';
+    pdfRenderContainer.style.top = '-9999px';
+    pdfRenderContainer.style.left = '-9999px';
     pdfRenderContainer.style.width = '800px';
     pdfRenderContainer.style.background = 'white';
     pdfRenderContainer.style.padding = '2rem';
     pdfRenderContainer.style.zIndex = '9999';
     pdfRenderContainer.style.display = 'block';
+    pdfRenderContainer.style.maxHeight = 'none';
+    pdfRenderContainer.style.overflow = 'visible';
 
     // Force reflow
-    pdfRenderContainer.offsetHeight;
+    void pdfRenderContainer.offsetHeight;
+
+    // Calculate total height
+    const totalHeight = Math.max(pdfRenderContainer.scrollHeight, 600);
 
     const opt = {
       margin: [0.7, 0.7, 0.7, 0.7],
@@ -437,13 +463,16 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
         useCORS: true,
         logging: false,
         width: 800,
-        height: pdfRenderContainer.scrollHeight + 100
+        height: totalHeight,
+        scrollY: 0,
+        windowHeight: totalHeight
       },
       jsPDF: { 
         unit: 'in', 
         format: 'a4', 
         orientation: 'portrait' 
-      }
+      },
+      pagebreak: { mode: ['css', 'legacy'] }
     };
 
     html2pdf()
@@ -452,10 +481,14 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
       .save()
       .then(() => {
         pdfRenderContainer.style.display = 'none';
+        pdfBtn.disabled = false;
+        pdfBtn.textContent = '⬇️ Download PDF';
         showStatus('✅ PDF downloaded successfully!', 'success');
       })
       .catch(err => {
         pdfRenderContainer.style.display = 'none';
+        pdfBtn.disabled = false;
+        pdfBtn.textContent = '⬇️ Download PDF';
         showStatus('❌ PDF error: ' + err.message, 'error');
         console.error('PDF error:', err);
       });
@@ -483,7 +516,12 @@ Let's add some structure:
 - item three with  extra   spaces 
 
 Email: test@example.com,  and a date: 2026-06-25. 
-We'll keep your formatting clean.`;
+We'll keep your formatting clean.
+
+Here's a longer section to test full PDF capture:
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Another paragraph with more text to ensure the PDF captures everything properly. The content should span multiple pages if needed. This is a test of the PDF generation system.`;
     inputText.value = sample;
     applyFormat();
   });
