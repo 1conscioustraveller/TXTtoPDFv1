@@ -168,23 +168,42 @@
       padding: 0.1rem 0.9rem;
       border-radius: 50px;
     }
-    .diff-highlight {
-      background: #e8f0fe;
-      padding: 0 4px;
-      border-radius: 4px;
-    }
     #statusMsg {
       font-size: 0.85rem;
-      color: #1f7b4d;
       padding: 0.3rem 1rem;
-      background: #e6f5ed;
       border-radius: 30px;
       display: inline-block;
+      margin-top: 0.5rem;
+    }
+    #statusMsg.success {
+      background: #e6f5ed;
+      color: #1f7b4d;
     }
     #statusMsg.error {
       background: #fde8e8;
       color: #b33c3c;
     }
+    #statusMsg.loading {
+      background: #e8f0fe;
+      color: #1f3a6b;
+    }
+    /* PDF print styles */
+    #pdfRenderContainer {
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: 800px;
+      background: white;
+      padding: 2rem;
+      z-index: 9999;
+      font-family: 'Segoe UI', 'Roboto', sans-serif;
+    }
+    #pdfRenderContainer .pdf-content p {
+      margin: 0.8rem 0;
+      line-height: 1.7;
+    }
+    #pdfRenderContainer .pdf-content p:first-child { margin-top: 0; }
+    #pdfRenderContainer .pdf-content p:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -233,6 +252,9 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
   </div>
 </div>
 
+<!-- Hidden container for PDF rendering -->
+<div id="pdfRenderContainer"></div>
+
 <script>
 (function() {
   const inputText = document.getElementById('inputText');
@@ -242,13 +264,14 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
   const clearBtn = document.getElementById('clearBtn');
   const sampleBtn = document.getElementById('sampleBtn');
   const statusMsg = document.getElementById('statusMsg');
+  const pdfRenderContainer = document.getElementById('pdfRenderContainer');
 
-  function showStatus(msg, isError = false) {
+  function showStatus(msg, type = '') {
     statusMsg.textContent = msg;
-    statusMsg.className = isError ? 'error' : '';
+    statusMsg.className = type;
     if (msg) statusMsg.style.display = 'inline-block';
     else statusMsg.style.display = 'none';
-    if (!isError) {
+    if (type === 'success') {
       setTimeout(() => { statusMsg.style.display = 'none'; }, 4000);
     }
   }
@@ -262,19 +285,17 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
     // 1. Normalize line endings
     t = t.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // 2. Fix multiple spaces (reduce to single space, but keep intentional indentation)
+    // 2. Fix multiple spaces
     t = t.replace(/[ ]{2,}/g, ' ');
 
-    // 3. Fix quotes: replace curly with straight
+    // 3. Fix quotes
     t = t.replace(/['']/g, "'").replace(/[""]/g, '"');
 
-    // 4. Fix spacing around punctuation: remove space before .,!?;:
+    // 4. Fix spacing around punctuation
     t = t.replace(/[ ]([.,!?;:])/g, '$1');
-    // Add space after punctuation if missing (but not at end of string)
     t = t.replace(/([.,!?;:])([^\s])/g, '$1 $2');
 
     // 5. Capitalize first letter of each sentence
-    // Split by sentence endings: . ! ? followed by space or end
     let parts = t.match(/[^.!?]+[.!?]+/g);
     if (parts) {
       let rest = t.slice(parts.join('').length);
@@ -287,7 +308,6 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
       });
       t = parts.join(' ') + (rest ? ' ' + rest : '');
     } else {
-      // No sentence punctuation found - capitalize first letter of each line
       t = t.split('\n').map(line => {
         if (line.trim().length > 0) {
           return line.trim().charAt(0).toUpperCase() + line.trim().slice(1);
@@ -299,43 +319,24 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
     // 6. Capitalize standalone "i"
     t = t.replace(/\bi\b/g, 'I');
 
-    // 7. Fix "i'm", "i'll", etc.
-    t = t.replace(/\bi'm\b/g, "I'm");
-    t = t.replace(/\bi'll\b/g, "I'll");
-    t = t.replace(/\bi've\b/g, "I've");
-    t = t.replace(/\bi'd\b/g, "I'd");
-
-    // 8. Fix common abbreviations (e.g., "dont" -> "don't")
+    // 7. Fix common contractions
     const fixes = {
-      'dont': "don't",
-      'wont': "won't",
-      'cant': "can't",
-      'shouldnt': "shouldn't",
-      'wouldnt': "wouldn't",
-      'couldnt': "couldn't",
-      'isnt': "isn't",
-      'arent': "aren't",
-      'wasnt': "wasn't",
-      'werent': "weren't",
-      'hasnt': "hasn't",
-      'havent': "haven't",
-      'hadnt': "hadn't",
-      'didnt': "didn't",
-      'doesnt': "doesn't",
-      'im': "I'm",
-      'ive': "I've",
-      'ill': "I'll",
-      'id': "I'd"
+      'dont': "don't", 'wont': "won't", 'cant': "can't",
+      'shouldnt': "shouldn't", 'wouldnt': "wouldn't", 'couldnt': "couldn't",
+      'isnt': "isn't", 'arent': "aren't", 'wasnt': "wasn't",
+      'werent': "weren't", 'hasnt': "hasn't", 'havent': "haven't",
+      'hadnt': "hadn't", 'didnt': "didn't", 'doesnt': "doesn't",
+      'im': "I'm", 'ive': "I've", 'ill': "I'll", 'id': "I'd"
     };
     for (let [key, val] of Object.entries(fixes)) {
       let regex = new RegExp('\\b' + key + '\\b', 'gi');
       t = t.replace(regex, val);
     }
 
-    // 9. Fix double spaces again
+    // 8. Double spaces cleanup
     t = t.replace(/[ ]{2,}/g, ' ');
 
-    // 10. Trim trailing spaces per line
+    // 9. Trim trailing spaces per line
     t = t.split('\n').map(line => line.trimEnd()).join('\n');
 
     return t;
@@ -366,7 +367,7 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
       return;
     }
 
-    previewContainer.innerHTML = `<div class="pdf-ready">${html}</div>`;
+    previewContainer.innerHTML = `<div class="pdf-content">${html}</div>`;
   }
 
   function escapeHtml(str) {
@@ -378,55 +379,54 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
   function applyFormat() {
     const raw = inputText.value;
     if (!raw.trim()) {
-      showStatus('⚠️ Please paste some text first', true);
+      showStatus('⚠️ Please paste some text first', 'error');
       return;
     }
     const corrected = autocorrectAndOrganize(raw);
-    // Show diff: how many changes?
     const changes = raw.length - corrected.length;
     inputText.value = corrected;
     renderPreview(corrected);
-    showStatus(`✅ Autocorrected • ${Math.abs(changes)} character changes`, false);
+    showStatus(`✅ Autocorrected • ${Math.abs(changes)} character changes`, 'success');
   }
 
-  // ---------- generate PDF (FIXED) ----------
+  // ---------- generate PDF (FIXED - using direct html2pdf on visible container) ----------
   function generatePDF() {
     const previewHtml = previewContainer.innerHTML;
     if (!previewHtml || previewHtml.includes('(empty)') || previewHtml.includes('Paste text')) {
-      showStatus('⚠️ Please format your text first (click "Autocorrect")', true);
+      showStatus('⚠️ Please format your text first (click "Autocorrect")', 'error');
       return;
     }
 
-    // Create a visible container for PDF generation
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.position = 'fixed';
-    pdfContainer.style.top = '-9999px';
-    pdfContainer.style.left = '-9999px';
-    pdfContainer.style.width = '800px';
-    pdfContainer.style.background = 'white';
-    pdfContainer.style.padding = '2rem';
-    pdfContainer.style.zIndex = '9999';
-    document.body.appendChild(pdfContainer);
+    showStatus('⏳ Generating PDF...', 'loading');
 
-    // Clone the preview content
-    const previewContent = previewContainer.cloneNode(true);
-    previewContent.style.maxHeight = 'none';
-    previewContent.style.overflow = 'visible';
-    previewContent.style.border = 'none';
-    previewContent.style.padding = '0';
-    previewContent.style.background = 'transparent';
-    pdfContainer.appendChild(previewContent);
+    // Clear and populate the render container
+    pdfRenderContainer.innerHTML = '';
+    
+    // Clone the content directly from preview
+    const contentClone = previewContainer.cloneNode(true);
+    contentClone.style.maxHeight = 'none';
+    contentClone.style.overflow = 'visible';
+    contentClone.style.border = 'none';
+    contentClone.style.padding = '0';
+    contentClone.style.background = 'transparent';
+    contentClone.style.minHeight = 'auto';
+    contentClone.classList.add('pdf-content');
+    
+    pdfRenderContainer.appendChild(contentClone);
 
-    // Also add style for PDF
-    const style = document.createElement('style');
-    style.textContent = `
-      body { font-family: 'Segoe UI', 'Roboto', sans-serif; background: white; }
-      .pdf-ready p { margin: 0.8rem 0; line-height: 1.7; }
-      .preview-box { padding: 0; }
-    `;
-    pdfContainer.appendChild(style);
+    // Make sure the container is visible for html2canvas
+    pdfRenderContainer.style.position = 'fixed';
+    pdfRenderContainer.style.top = '0';
+    pdfRenderContainer.style.left = '0';
+    pdfRenderContainer.style.width = '800px';
+    pdfRenderContainer.style.background = 'white';
+    pdfRenderContainer.style.padding = '2rem';
+    pdfRenderContainer.style.zIndex = '9999';
+    pdfRenderContainer.style.display = 'block';
 
-    // Generate PDF
+    // Force reflow
+    pdfRenderContainer.offsetHeight;
+
     const opt = {
       margin: [0.7, 0.7, 0.7, 0.7],
       filename: 'formatted-text.pdf',
@@ -436,42 +436,39 @@ Email: test@example.com,  and a date: 2026-06-25.</textarea>
         letterRendering: true,
         useCORS: true,
         logging: false,
-        width: 800
+        width: 800,
+        height: pdfRenderContainer.scrollHeight + 100
       },
       jsPDF: { 
         unit: 'in', 
         format: 'a4', 
         orientation: 'portrait' 
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }
     };
-
-    showStatus('⏳ Generating PDF...', false);
 
     html2pdf()
       .set(opt)
-      .from(pdfContainer)
+      .from(pdfRenderContainer)
       .save()
       .then(() => {
-        document.body.removeChild(pdfContainer);
-        showStatus('✅ PDF downloaded successfully!', false);
+        pdfRenderContainer.style.display = 'none';
+        showStatus('✅ PDF downloaded successfully!', 'success');
       })
       .catch(err => {
-        document.body.removeChild(pdfContainer);
-        showStatus('❌ PDF error: ' + err.message, true);
+        pdfRenderContainer.style.display = 'none';
+        showStatus('❌ PDF error: ' + err.message, 'error');
         console.error('PDF error:', err);
       });
   }
 
   // ---------- event binding ----------
   formatBtn.addEventListener('click', applyFormat);
-
   pdfBtn.addEventListener('click', generatePDF);
 
   clearBtn.addEventListener('click', function() {
     inputText.value = '';
     previewContainer.innerHTML = `<span style="color: #7a8b9f;">(empty) paste text and click "Autocorrect"</span>`;
-    showStatus('', false);
+    showStatus('', '');
   });
 
   sampleBtn.addEventListener('click', function() {
